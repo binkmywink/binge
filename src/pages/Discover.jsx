@@ -1,18 +1,58 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { SHOWS } from "../data/seed";
 import { useStore } from "../hooks/useStore";
+import { searchShows, getPopularShows } from "../services/tvApi";
 
 export default function Discover() {
   const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const { state, addShow } = useStore();
   const navigate = useNavigate();
 
-  const results = SHOWS.filter((s) =>
-    s.title.toLowerCase().includes(query.toLowerCase()) ||
-    s.genres.some((g) => g.toLowerCase().includes(query.toLowerCase())) ||
-    s.network.toLowerCase().includes(query.toLowerCase())
-  );
+  // Load popular shows on mount
+  useEffect(() => {
+    const loadPopular = async () => {
+      setLoading(true);
+      try {
+        const popular = await getPopularShows();
+        setResults(popular);
+      } catch (error) {
+        console.error("Error loading popular shows:", error);
+        setResults(SHOWS);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadPopular();
+  }, []);
+
+  // Search for shows when query changes
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (query.trim()) {
+        setLoading(true);
+        setHasSearched(true);
+        try {
+          const searchResults = await searchShows(query);
+          setResults(searchResults);
+        } catch (error) {
+          console.error("Error searching shows:", error);
+          setResults([]);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setHasSearched(false);
+        const popular = await getPopularShows();
+        setResults(popular);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [query]);
 
   return (
     <div className="page">
@@ -29,6 +69,8 @@ export default function Discover() {
         onChange={(e) => setQuery(e.target.value)}
         autoFocus
       />
+
+      {loading && <div style={{ textAlign: "center", padding: "2rem", color: "var(--text-secondary)" }}>Loading...</div>}
 
       <div className="show-grid">
         {results.map((show) => {
@@ -56,7 +98,7 @@ export default function Discover() {
                   <button
                     className="btn btn-ghost btn-sm"
                     style={{ marginTop: 4, width: "100%" }}
-                    onClick={(e) => { e.stopPropagation(); addShow(show.id); navigate(`/show/${show.id}`); }}
+                    onClick={(e) => { e.stopPropagation(); addShow(show.id, show); navigate(`/show/${show.id}`); }}
                   >
                     + Add to watchlist
                   </button>
@@ -67,10 +109,10 @@ export default function Discover() {
         })}
       </div>
 
-      {results.length === 0 && (
+      {results.length === 0 && !loading && (
         <div className="empty-state">
-          <p>No shows match "{query}"</p>
-          <p style={{ marginTop: 8, fontSize: 12 }}>More shows coming soon — this is a prototype!</p>
+          <p>{hasSearched ? `No shows match "${query}"` : "No shows found"}</p>
+          <p style={{ marginTop: 8, fontSize: 12 }}>Try searching for a show title, like "Breaking Bad" or "The Office"</p>
         </div>
       )}
     </div>

@@ -1,7 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useStore } from "../hooks/useStore";
 import { SHOWS, FRIENDS, FRIEND_PROGRESS } from "../data/seed";
+import { getShowDetails } from "../services/tvApi";
 import TimelineScrubber from "../components/TimelineScrubber";
 import EpisodeRow from "../components/EpisodeRow";
 
@@ -11,8 +12,28 @@ export default function ShowPage() {
   const { state, markWatched, setRating, setNote, addShow } = useStore();
   const [activeSeason, setActiveSeason] = useState(1);
   const [activeTab, setActiveTab] = useState("episodes");
+  const [loading, setLoading] = useState(false);
 
-  const show = SHOWS.find((s) => s.id === id);
+  // Try to find show in seed data first, then in cached shows
+  let show = SHOWS.find((s) => s.id === id) || state.shows?.[id];
+
+  // If show not found locally, attempt to fetch from API
+  useEffect(() => {
+    if (!show && id.startsWith("tvmaze-")) {
+      setLoading(true);
+      const tvmazeId = id.replace("tvmaze-", "");
+      getShowDetails(parseInt(tvmazeId))
+        .then((fetchedShow) => {
+          if (fetchedShow) {
+            // Add the fetched show to the store
+            addShow(id, fetchedShow);
+          }
+        })
+        .finally(() => setLoading(false));
+    }
+  }, [id, show, addShow]);
+
+  if (loading) return <div className="page"><p style={{ color: "var(--text2)" }}>Loading show details...</p></div>;
   if (!show) return <div className="page"><p style={{ color: "var(--text2)" }}>Show not found.</p></div>;
 
   const prog = state.progress[id];

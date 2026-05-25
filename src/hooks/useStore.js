@@ -5,7 +5,10 @@ const STORAGE_KEY = "framebyfame_v1";
 
 function defaultState() {
   const progress = {};
+  const shows = {};
+  
   SHOWS.forEach((show) => {
+    shows[show.id] = show;
     progress[show.id] = {
       watching: false,
       currentSeason: 1,
@@ -48,7 +51,7 @@ function defaultState() {
     watched: true, rating: 4, note: "", watchedAt: new Date(Date.now() - 5 * 86400000).toISOString(),
   };
 
-  return { progress, profile: { name: "You", initials: "ME" } };
+  return { progress, shows, profile: { name: "You", initials: "ME" } };
 }
 
 function load() {
@@ -130,14 +133,51 @@ export function useStore() {
     });
   }, []);
 
-  const addShow = useCallback((showId) => {
-    setState((prev) => ({
-      ...prev,
-      progress: {
-        ...prev.progress,
-        [showId]: { ...prev.progress[showId], watching: true },
-      },
-    }));
+  const addShow = useCallback((showId, showData = null) => {
+    setState((prev) => {
+      const existingShow = prev.progress[showId];
+      
+      // If show doesn't exist, create it from showData or initialize empty
+      if (!existingShow) {
+        const episodes = {};
+        if (showData?.seasons) {
+          showData.seasons.forEach((season) => {
+            season.episodes.forEach((ep) => {
+              episodes[`s${season.number}e${ep.n}`] = {
+                watched: false,
+                rating: 0,
+                note: "",
+                watchedAt: null,
+              };
+            });
+          });
+        }
+        
+        return {
+          ...prev,
+          shows: {
+            ...prev.shows,
+            [showId]: showData,
+          },
+          progress: {
+            ...prev.progress,
+            [showId]: {
+              watching: true,
+              currentSeason: 1,
+              episodes,
+            },
+          },
+        };
+      }
+      
+      return {
+        ...prev,
+        progress: {
+          ...prev.progress,
+          [showId]: { ...existingShow, watching: true },
+        },
+      };
+    });
   }, []);
 
   const getShowProgress = useCallback(
