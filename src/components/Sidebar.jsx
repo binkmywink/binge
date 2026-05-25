@@ -46,7 +46,7 @@ export default function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
-        frame<span>by</span>frame
+        binge
       </div>
 
       <nav className="sidebar-section">
